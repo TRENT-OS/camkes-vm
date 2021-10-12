@@ -137,6 +137,8 @@ seL4_CPtr camkes_get_smmu_cb_cap();
 seL4_CPtr camkes_get_smmu_sid_cap();
 #endif
 
+void dump_blob(void *blob, int debug);
+
 int get_crossvm_irq_num(void)
 {
     return free_plat_interrupts[0];
@@ -726,6 +728,9 @@ static int generate_fdt(vm_t *vm, void *fdt_ori, void *gen_fdt, int buf_size, si
 {
     int err = 0;
     fdtgen_context_t *context = fdtgen_new_context(gen_fdt, buf_size);
+
+    ZF_LOGE("generate_fdt");
+
     if (context == NULL) {
         return -1;
     }
@@ -778,14 +783,16 @@ static int generate_fdt(vm_t *vm, void *fdt_ori, void *gen_fdt, int buf_size, si
         }
     }
 
+    dump_blob(gen_fdt, 1);
     fdt_pack(gen_fdt);
-
+    dump_blob(gen_fdt, 1);
     return 0;
 }
 
 static int load_generated_dtb(vm_t *vm, uintptr_t paddr, void *addr, size_t size, size_t offset, void *cookie)
 {
     ZF_LOGD("paddr: 0x%lx, addr: 0x%lx, size: 0x%lx, offset: 0x%lx", paddr, (seL4_Word) addr, size, offset);
+    ZF_LOGE("paddr: 0x%lx, addr: 0x%lx, size: 0x%lx, offset: 0x%lx", paddr, (seL4_Word) addr, size, offset);
     memcpy(addr, cookie + offset, size);
     return 0;
 }
@@ -796,6 +803,7 @@ static int load_linux(vm_t *vm, const char *kernel_name, const char *dtb_name, c
     seL4_Word dtb;
     int err;
 
+    ZF_LOGE("load linux");
     /* Install devices */
     err = install_linux_devices(vm);
     if (err) {
@@ -804,8 +812,15 @@ static int load_linux(vm_t *vm, const char *kernel_name, const char *dtb_name, c
     }
     /* Load kernel */
     guest_kernel_image_t kernel_image_info;
+
+
     err = vm_load_guest_kernel(vm, kernel_name, linux_ram_base, 0, &kernel_image_info);
     entry = kernel_image_info.kernel_image.load_paddr;
+    ZF_LOGE("load_generated_dtb entry=%x", entry);
+    ZF_LOGE("load_linux, paddr=%x, align=%x, size=%x",
+        kernel_image_info.kernel_image.load_paddr,
+        kernel_image_info.kernel_image.alignment,
+        kernel_image_info.kernel_image.size);
     if (!entry || err) {
         return -1;
     }
@@ -845,6 +860,7 @@ static int load_linux(vm_t *vm, const char *kernel_name, const char *dtb_name, c
         /* Load device tree */
         guest_image_t dtb_image;
         err = vm_load_guest_module(vm, dtb_name, dtb_addr, 0, &dtb_image);
+        ZF_LOGE("load_linux dtb_name=%s, load_paddr=%x:%x\n", dtb_name, dtb_addr, dtb_image.load_paddr);
         dtb = dtb_image.load_paddr;
         if (!dtb || err) {
             return -1;
@@ -870,6 +886,9 @@ void parse_camkes_linux_attributes(void)
     dtb_addr = strtoul(linux_address_config.dtb_addr, NULL, 0);
     initrd_max_size = strtoul(linux_address_config.initrd_max_size, NULL, 0);
     initrd_addr = strtoul(linux_address_config.initrd_addr, NULL, 0);
+
+    ZF_LOGE("parse_camkes_linux_attributes, base=%x, paddr_base=%x, size=%x, offset=%x",linux_ram_base, linux_ram_paddr_base, linux_ram_size, linux_ram_offset);
+    ZF_LOGE("parse_camkes_linux_attributes, dtb_addr=%x, initrd_max_size=%x, initrd_addr=%x", dtb_addr, initrd_max_size, initrd_addr);
 }
 
 /* Async event handling registration implementation */
@@ -903,6 +922,9 @@ int register_async_event_handler(seL4_Word badge, async_event_handler_fn_t callb
 static int handle_async_event(vm_t *vm, seL4_Word badge, seL4_MessageInfo_t tag, void *cookie)
 {
     seL4_Word label = seL4_MessageInfo_get_label(tag);
+
+    ZF_LOGE("handle_async_event, vm=%p, badge=%x, label=%x, cookie=%p",
+        vm, badge, label, cookie);
     if (badge == 0) {
         if (label == IRQ_MESSAGE_LABEL) {
             irq_server_handle_irq_ipc(_irq_server, tag);
@@ -1001,6 +1023,8 @@ static memory_fault_result_t handle_on_demand_fault_callback(vm_t *vm, vm_vcpu_t
 memory_fault_result_t unhandled_mem_fault_callback(vm_t *vm, vm_vcpu_t *vcpu,
                                                    uintptr_t paddr, size_t len, void *cookie)
 {
+    ZF_LOGE("unhandled_mem_fault_cb vm=%p, vcpu=%p, paddr=%x, len=%d, cookie=%p",
+        vm, vcpu, paddr, len, cookie);
 #ifdef CONFIG_VM_ONDEMAND_DEVICE_INSTALL
     uintptr_t addr = paddr & ~0xfff;
     int mapped;
@@ -1025,6 +1049,8 @@ int main_continued(void)
 {
     vm_t vm;
     int err;
+
+    ZF_LOGE("main_continued");
 
     parse_camkes_linux_attributes();
 
@@ -1125,6 +1151,7 @@ int main_continued(void)
         return -1;
     }
 
+    ZF_LOGE("vcpu_start");
     err = vcpu_start(vm_vcpu);
     if (err) {
         ZF_LOGE("Failed to start Boot VCPU");
@@ -1148,12 +1175,16 @@ int main_continued(void)
 extern const int __attribute__((weak)) base_prio;
 extern const int __attribute__((weak)) num_vcpus;
 
+
+
 int run(void)
 {
     /* if the base_prio attribute is set, use it */
     if (&base_prio != NULL) {
         VM_PRIO = base_prio;
     }
+    ZF_LOGE("run vm_prio=%d", VM_PRIO);
+    ZF_LOGE("run &num_vcpus=%p", &num_vcpus);
     /* if the num_vcpus attribute is set, try to use it */
     if (&num_vcpus != NULL) {
         if (num_vcpus > CONFIG_MAX_NUM_NODES) {
@@ -1167,6 +1198,6 @@ int run(void)
         }
     }
 
+    ZF_LOGE("run #2, NUM_VCPUS=%d", NUM_VCPUS);
     return main_continued();
 }
-
