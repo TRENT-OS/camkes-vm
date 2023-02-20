@@ -1380,7 +1380,7 @@ static int main_continued(void)
         }
     }
 
-    return 0;
+    UNREACHABLE();
 }
 
 /* base_prio is an optional attribute of the VM component. */
