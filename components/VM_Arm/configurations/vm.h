@@ -67,6 +67,7 @@
     attribute int num_vcpus = 1; \
     attribute int num_extra_frame_caps; \
     attribute int extra_frame_map_address; \
+    attribute string linux_debug_name = "linux-vm"; \
     attribute { \
         string linux_ram_base; \
         string linux_ram_paddr_base; \
