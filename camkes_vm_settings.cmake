@@ -11,7 +11,7 @@ set(KernelArch x86 CACHE STRING "" FORCE)
 set(KernelPlatform pc99 CACHE STRING "" FORCE)
 set(KernelVTX ON CACHE BOOL "" FORCE)
 set(KernelRootCNodeSizeBits 20 CACHE STRING "" FORCE)
-set(KernelMaxNumBootinfoUntypedCap 100 CACHE STRING "")
+set(KernelMaxNumBootinfoUntypedCaps 100 CACHE STRING "")    // Fix error due to missing "s" at the end ???
 set(KernelIRQController IOAPIC CACHE STRING "" FORCE)
 if(CAmkESVMGuestDMAIommu)
     set(KernelIOMMU ON CACHE BOOL "" FORCE)
