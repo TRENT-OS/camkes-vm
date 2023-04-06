@@ -15,6 +15,8 @@ typedef struct {
 
     unsigned int num_vcpus;
 
+    char const *dtb_node_gic;
+
     struct {
         uintptr_t phys_base;
         uintptr_t base;
