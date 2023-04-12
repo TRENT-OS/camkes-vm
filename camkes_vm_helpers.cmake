@@ -129,10 +129,11 @@ function(DefineCAmkESVMFileServer)
     # can happen when the caller uses variables for the lists, when in some
     # configurations the lists remain empty.
 
+    set(DEPS "")
     foreach(element IN LISTS PARAM_DEPENDS)
         foreach(item IN LISTS element)
             if(item)
-                set_property(TARGET ${FSRV_TARGET} APPEND PROPERTY DEPS ${item})
+                list(APPEND DEPS "${item}")
             endif()
         endforeach()
     endforeach()
@@ -157,52 +158,22 @@ function(DefineCAmkESVMFileServer)
                     set(FILE_NAME "${CMAKE_MATCH_1}")
                     get_filename_component(CPIO_NAME "${FILE_NAME}" NAME)
                 endif()
-                set_property(
-                    TARGET ${FSRV_TARGET}
-                    APPEND
-                    PROPERTY FILES "${CPIO_NAME}:${FILE_NAME}"
+                set(CPIO_FILE "${PARAM_INSTANCE}/files/${CPIO_NAME}")
+                add_custom_command(
+                    OUTPUT "${CPIO_FILE}"
+                    COMMENT "copy: ${FILE_NAME} -> ${CPIO_FILE}"
+                    COMMAND
+                        ${CMAKE_COMMAND} -E copy "${FILE_NAME}" "${CPIO_FILE}"
+                    VERBATIM
+                    DEPENDS ${FILE_NAME} ${DEPS}
                 )
+                # There is no need to create an explicit target for the command
+                # above, because the archive creation depends on all files
+                # listed in CPIO_FILES. The command above is the creation rule
+                # for each one.
+                list(APPEND CPIO_FILES "${CPIO_FILE}")
             endif()
         endforeach()
-    endforeach()
-
-    # now process the file/deps list
-    get_target_property(files ${FSRV_TARGET} FILES)
-    if(NOT files) # this also catches "files-NOTFOUND" if property is not set
-        set(files "")
-    endif()
-    get_target_property(deps ${FSRV_TARGET} DEPS)
-    if(NOT deps) # this also catches "deps-NOTFOUND" if property is not set
-        set(deps "")
-    endif()
-
-    set(CPIO_FILES "")
-    foreach(item IN LISTS files) # <CPIO_NAME>:<FILENAME>
-        string(
-            REGEX
-                MATCH
-                "^([^:]+):([^:]+)$"
-                cpio_item
-                "${item}"
-        )
-        if(NOT cpio_item)
-            message(FATAL_ERROR "invalid CPIO file format: '${item}'")
-        endif()
-        set(CPIO_NAME "${CMAKE_MATCH_1}")
-        set(FILE_NAME "${CMAKE_MATCH_2}")
-        set(CPIO_FILE "${PARAM_INSTANCE}/files/${CPIO_NAME}")
-        add_custom_command(
-            OUTPUT "${CPIO_FILE}"
-            COMMENT "copy: ${FILE_NAME} -> ${CPIO_FILE}"
-            COMMAND
-                ${CMAKE_COMMAND} -E copy "${FILE_NAME}" "${CPIO_FILE}"
-            VERBATIM
-            DEPENDS ${FILE_NAME} ${deps}
-        )
-        # There is no need to create an explicit target for the command above,
-        # the archive creation depends on all files in CPIO_FILES, where the
-        # command above is the creation rule for each one.
-        list(APPEND CPIO_FILES "${CPIO_FILE}")
     endforeach()
 
     # Build CPIO archive. It implicitly depends on all files in CPIO_FILES,
