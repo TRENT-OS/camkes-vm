@@ -937,6 +937,12 @@ static int load_vm_images(vm_t *vm, const vm_config_t *vm_config)
         if (!initrd || err) {
             return -1;
         }
+
+        ZF_LOGI("VM: %p - %p (initrd '%s')",
+                (void *)initrd_image.load_paddr,
+                (void *)(initrd_image.load_paddr + initrd_image.size),
+                vm_config->files.initrd);
+
         if (vm_config->generate_dtb) {
             err = fdt_append_chosen_node_with_initrd_info(gen_dtb_buf,
                                                           vm_config->initrd_addr,
